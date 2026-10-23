@@ -1,32 +1,42 @@
 # human-approval-gate
 
-A small demo of one rule: an AI agent may plan on its own, but it does not act until a person approves the plan, and everything it does is written to a log nobody can quietly edit.
+Agents plan alone, act only after a person says yes, and record every step in a hash-chained audit log that shows any tampering.
 
-## How it works
+**This is a scripted demo.** It represents the governance process I use in Palladium, my own agent framework. It is not a sample or excerpt of that system, and no Palladium code or data is in it.
 
-1. **Plan.** The agent turns a task into steps.
-2. **Pause.** It shows the whole plan to a person and waits for yes or no.
-3. **Act.** Only after a yes does it run the steps.
-4. **Log.** Every stage is appended to `audit.log`. Each line holds the SHA-256 hash of the line before it, so changing or removing any line breaks the chain and `Log.verify()` returns `False`.
+- Live page: https://demos.obviouslogic.ai/human-approval-gate/
+- Source: https://github.com/obviouslogic-ai/human-approval-gate
 
-## Run it
+## How it fits Palladium governance
 
+In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every decision is logged so it can be checked later. This repo acts that rule out in about 100 lines of standard-library Python.
+
+## Run the CLI
+
+```sh
+python3 gate.py "read report, summarize it, file summary"   # asks y/n, writes audit.log, then verifies the chain
 ```
-python3 gate.py "read report, summarize it, file summary"
+
+Standard library only, no installs.
+
+## Run the page locally
+
+```sh
+cd web && ./get-pyodide.sh && cd ..   # once: downloads Pyodide 0.27.7 into web/vendor (gitignored)
+python3 -m http.server 8000   # from the folder that holds this repo
+# open http://localhost:8000/human-approval-gate/web/
 ```
 
-## Test it
+Make a plan, approve or reject it, then press **Tamper with entry 1** and watch every later log line turn red.
 
-```
+The page runs this repo's real Python in the browser through Pyodide, so what you click is the same code the tests cover. Styling comes from `web/kit/`, shared across all five demos.
+
+## Tests
+
+```sh
 python3 -m unittest -v
 ```
 
-Python 3.10+, standard library only.
+## License
 
-## Why
-
-Human in the loop only works if the pause comes before the action and the record cannot be rewritten afterward. This demo keeps both in about 80 lines.
-
-## Demo
-
-Terminal recording: `demo.cast` (play with `asciinema play demo.cast`).
+MIT
