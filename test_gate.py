@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gate import Log, run
+from gate import Log, risk, run
 
 
 class GateTest(unittest.TestCase):
@@ -44,6 +44,23 @@ class GateTest(unittest.TestCase):
         del lines[2]
         self.log.path.write_text("\n".join(lines) + "\n")
         self.assertFalse(self.log.verify())
+
+    def test_risk_flags_world_changing_steps(self):
+        self.assertEqual(risk("send 2400 reminder emails"), "write")
+        self.assertEqual(risk("read open invoices"), "read")
+        self.assertEqual(risk(""), "read")
+
+    def test_planned_entry_lists_write_steps(self):
+        run("read a, delete b", lambda s: False, self.act, self.log)
+        self.assertEqual(self.log.entries()[0]["data"]["writes"], ["delete b"])
+
+    def test_ungated_acts_without_asking_and_logs_it(self):
+        asked = []
+        run("a, b", lambda s: asked.append(s) or False, self.act, self.log, gated=False)
+        self.assertEqual(asked, [])
+        self.assertEqual(self.calls, ["a", "b"])
+        self.assertIsNone(self.log.entries()[1]["data"]["approved"])
+        self.assertTrue(self.log.verify())
 
 
 if __name__ == "__main__":

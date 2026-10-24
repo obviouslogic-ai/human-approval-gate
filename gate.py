@@ -50,15 +50,32 @@ def plan(task: str) -> list[str]:
     return [step.strip() for step in task.split(",") if step.strip()]
 
 
-def run(task: str, approve, act, log: Log) -> list[str]:
-    """Plan, ask `approve(steps)` once, then act only if a person said yes."""
+# A step whose first word is one of these changes the world outside the agent.
+WRITE_VERBS = {"send", "email", "delete", "merge", "pay", "transfer", "publish", "deploy", "update", "cancel", "refund"}
+
+
+def risk(step: str) -> str:
+    """'write' if the step changes something outside the agent, else 'read'."""
+    words = step.split()
+    return "write" if words and words[0].lower() in WRITE_VERBS else "read"
+
+
+def run(task: str, approve, act, log: Log, gated: bool = True) -> list[str]:
+    """Plan, ask `approve(steps)` once, then act only if a person said yes.
+
+    With gated=False the plan runs straight through and the log records that
+    no one was asked. That mode exists only to show what the gate prevents.
+    """
     steps = plan(task)
-    log.append("planned", task=task, steps=steps)
-    approved = bool(approve(steps))
-    log.append("approval", approved=approved)
-    if not approved:
-        log.append("stopped", reason="not approved")
-        return []
+    log.append("planned", task=task, steps=steps, writes=[s for s in steps if risk(s) == "write"])
+    if gated:
+        approved = bool(approve(steps))
+        log.append("approval", approved=approved)
+        if not approved:
+            log.append("stopped", reason="not approved")
+            return []
+    else:
+        log.append("approval", approved=None, reason="no gate, nobody asked")
     results = []
     for step in steps:
         result = act(step)
