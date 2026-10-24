@@ -9,10 +9,17 @@ ol.lane{list-style:none;padding:0;margin:0;font-size:19px;line-height:1.5}#steps
 .entry{padding:8px 0;font:12px/1.5 var(--mono);word-break:break-all;transition:color .6s;opacity:0}.entry.in{opacity:1;transition:opacity .4s,color .6s}.entry .hash{color:var(--dim)}
 .entry.bad,.entry.bad .hash{color:var(--bad)}#status.ok{color:var(--ok)}#status.fail{color:var(--bad)}
 .who{font:11px var(--mono);letter-spacing:.14em;color:var(--dim);margin-top:14px;min-height:1.4em}
+
+ol.lane{font-size:1.2em}#ask p{font-size:.95em}.entry{font-size:.78em;padding:.4em 0}.who{font-size:.7em}
+#log{min-height:0}
+@media (max-width:600px),(orientation:portrait){.work{grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr);gap:2vh 5vw}.work>.col:nth-child(3){grid-column:1/-1}ol.lane{font-size:1em}}
+@media (orientation:portrait) and (max-height:760px){.entry .data{display:none}}
+@media (max-height:520px){.entry .data{display:none}.entry{padding:.15em 0}}
+
 </style></head><body class="stage">
 <main class="stage-main">
 <div><div class="tele" data-kit-tele></div><h1>Nothing acts until a person says yes</h1></div>
-<div class="work">
+<div class="work" data-fit>
  <div class="col"><div class="tele">01 / <b>AGENT PLANS</b></div><div class="tele" style="color:var(--fg)">TASK: <span id="task">read report, summarize it, file summary</span></div><ol id="steps" class="lane"></ol><div class="who" id="agent"></div></div>
  <div class="col"><div class="tele">02 / <b>HUMAN DECIDES</b></div><div id="ask"><p>The agent wants to run these steps. Nothing has happened yet.</p><button id="approve" class="go big">Approve</button> &nbsp; <button id="reject">Reject</button></div><ol id="results" class="lane"></ol></div>
  <div class="col"><div class="tele">03 / <b>AUDIT LOG</b> &nbsp; SHA-256 CHAIN &nbsp; <span id="status" class="verdict" style="font-size:12px;margin:0">verify(): -</span></div><div id="log"></div></div>
@@ -22,7 +29,7 @@ ol.lane{list-style:none;padding:0;margin:0;font-size:19px;line-height:1.5}#steps
 <template id="info"><p>In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every step lands in a hash-chained log.</p><p>This page runs the real <code>gate.py</code> from this repo in your browser with Pyodide. After you decide, the page edits one log line to show the chain catching it.</p></template>
 <script src="vendor/pyodide.js"></script>
 <script type="module">
-import { mount, setStatus, sleep } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
+import { mount, setStatus, sleep, autoFit } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
 mount("human-approval-gate", { status: "LOADING PYTHON" });
 const $ = id => document.getElementById(id);
 const py = await loadPy({ "gate.py": "../gate.py" });
@@ -45,7 +52,7 @@ const T = () => $("task").textContent;
 async function render(anim) {
   const entries = JSON.parse(py.runPython("json.dumps(log.entries())")), ok = py.runPython("log.verify()"), bad = py.runPython("first_bad()");
   const have = $("log").children.length;
-  $("log").innerHTML = entries.map((e, i) => `<div class="entry${i < have || !anim ? " in" : ""}${bad >= 0 && e.seq >= bad ? " bad" : ""}"><span class="tele">#${String(e.seq).padStart(2, "0")} ${e.event}</span><br>${JSON.stringify(e.data)}<br><span class="hash">prev ${e.prev.slice(0, 12)}… hash ${e.hash.slice(0, 12)}…</span></div>`).join("");
+  $("log").innerHTML = entries.map((e, i) => `<div class="entry${i < have || !anim ? " in" : ""}${bad >= 0 && e.seq >= bad ? " bad" : ""}"><span class="tele">#${String(e.seq).padStart(2, "0")} ${e.event}</span><span class="data"><br>${JSON.stringify(e.data)}</span><br><span class="hash">prev ${e.prev.slice(0, 12)}… hash ${e.hash.slice(0, 12)}…</span></div>`).join("");
   for (const el of $("log").querySelectorAll(".entry:not(.in)")) { await sleep(450); el.classList.add("in"); }
   $("status").textContent = "verify(): " + (entries.length ? (ok ? "chain valid" : "chain broken") : "-");
   $("status").className = "verdict " + (entries.length ? (ok ? "ok" : "fail") : ""); return ok;
@@ -68,5 +75,5 @@ async function decide(yes) {
   setStatus("DONE"); $("go").textContent = "Replay"; $("go").disabled = false; document.body.dataset.done = "1";
 }
 $("go").onclick = submit; $("approve").onclick = () => decide(true); $("reject").onclick = () => decide(false);
-$("go").disabled = false; setStatus("READY"); document.body.dataset.ready = "1";
+$("go").disabled = false; setStatus("READY"); autoFit(); document.body.dataset.ready = "1";
 </script></body></html>
