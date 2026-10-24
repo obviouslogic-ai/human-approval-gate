@@ -1,79 +1,124 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Approval gate · ObviousLogic demos</title><link rel="stylesheet" href="kit/kit.css">
 <style>
-.work{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:3vw}
-.col{min-height:0;overflow:hidden}.col .tele{margin-bottom:10px}
-.lane li{opacity:0;transform:translateY(6px);transition:all .4s}.lane li.in{opacity:1;transform:none}
-ol.lane{list-style:none;padding:0;margin:0;font-size:19px;line-height:1.5}#steps li::before{content:"\2192  ";color:var(--dim)}#results li{color:var(--ok)}
-#ask{margin-top:22px;display:none}#ask.show{display:block}#ask p{font-size:15px;color:var(--dim);margin:0 0 6px}
-.entry{padding:8px 0;font:12px/1.5 var(--mono);word-break:break-all;transition:color .6s;opacity:0}.entry.in{opacity:1;transition:opacity .4s,color .6s}.entry .hash{color:var(--dim)}
-.entry.bad,.entry.bad .hash{color:var(--bad)}#status.ok{color:var(--ok)}#status.fail{color:var(--bad)}
-.who{font:11px var(--mono);letter-spacing:.14em;color:var(--dim);margin-top:14px;min-height:1.4em}
-
-ol.lane{font-size:1.2em}#ask p{font-size:.95em}.entry{font-size:.78em;padding:.4em 0}.who{font-size:.7em}
-#log{min-height:0}
-@media (max-width:600px),(orientation:portrait){.work{grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr);gap:2vh 5vw}.work>.col:nth-child(3){grid-column:1/-1}ol.lane{font-size:1em}}
-@media (orientation:portrait) and (max-height:760px){.entry .data{display:none}}
-@media (max-height:520px){.entry .data{display:none}.entry{padding:.15em 0}}
-
+.work{display:grid;grid-template-columns:1fr 1.25fr 1fr;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"plan flow log" "cost cost log";gap:1.6dvh 2.6vw}
+.work{font-size:calc(1.3em * var(--k,1))}.work>div{min-height:0;min-width:0;overflow:hidden}.work .tele{font-size:.62em}
+.ent{font:600 .9em var(--mono);letter-spacing:.1em}
+#planc{grid-area:plan}#flowc{grid-area:flow}#logc{grid-area:log}#costc{grid-area:cost}
+.tele{margin-bottom:.35em}
+ol.steps{list-style:none;padding:0;margin:0;font-size:.95em;line-height:1.35}
+ol.steps li{opacity:0;transform:translateY(5px);transition:all .35s;margin:.25em 0}ol.steps li.in{opacity:1;transform:none}
+ol.steps li.flaw .txt{color:var(--bad)}ol.steps .why2{display:block;font:.72em var(--mono);color:var(--bad);margin-left:3.6em}
+.lane{margin-bottom:.9em}.lane .res{font:.78em/1.5 var(--mono);min-height:2.6em}
+.lane .res .x{color:var(--bad)}.lane .res .y{color:var(--ok)}
+#ask{display:none;margin-top:.2em}#ask.show{display:block}#ask p{margin:0 0 .2em;font-size:.85em;color:var(--dim)}
+#ask button{margin-right:1.6em}#ask .big{font-size:.95em}
+.entry{padding:.25em 0;font:.72em/1.4 var(--mono);word-break:break-all;opacity:0;cursor:pointer;transition:opacity .4s,color .6s}.entry.in{opacity:1}.entry:hover{color:var(--accent)}
+.entry .hash{color:var(--dim)}.entry.bad,.entry.bad .hash{color:var(--bad)}
+#chain.ok{color:var(--ok)}#chain.fail{color:var(--bad)}#hint{font:.66em var(--mono);color:var(--accent);letter-spacing:.08em;min-height:1.2em}
+.act select{margin-right:0;max-width:100%}
+@media (max-width:760px),(orientation:portrait){
+ .work{grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"flow flow" "plan log" "cost cost";gap:1.2dvh 4vw}
+ .work{font-size:calc(1.05em * var(--k,1))}.entry .data{display:none}.lane{margin-bottom:.4em}.why{font-size:12px}}
+@media (max-width:760px) and (max-height:700px){.entry .hash{display:none}}
+@media (max-height:560px){.entry .data{display:none}.why{display:none}}
 </style></head><body class="stage">
 <main class="stage-main">
-<div><div class="tele" data-kit-tele></div><h1>Nothing acts until a person says yes</h1></div>
+<div><div class="tele" data-kit-tele></div><h1>Nothing an agent does to the world runs until a person says yes</h1>
+<p class="why"><b>WHY I BUILT THIS.</b> Agents plan fast and are sometimes confidently wrong. One bad step, like emailing every contact instead of the overdue ones, costs far more to undo than a two minute review. So every step that writes waits for my yes, and every decision lands in a log no one can quietly edit.</p></div>
 <div class="work" data-fit>
- <div class="col"><div class="tele">01 / <b>AGENT PLANS</b></div><div class="tele" style="color:var(--fg)">TASK: <span id="task">read report, summarize it, file summary</span></div><ol id="steps" class="lane"></ol><div class="who" id="agent"></div></div>
- <div class="col"><div class="tele">02 / <b>HUMAN DECIDES</b></div><div id="ask"><p>The agent wants to run these steps. Nothing has happened yet.</p><button id="approve" class="go big">Approve</button> &nbsp; <button id="reject">Reject</button></div><ol id="results" class="lane"></ol></div>
- <div class="col"><div class="tele">03 / <b>AUDIT LOG</b> &nbsp; SHA-256 CHAIN &nbsp; <span id="status" class="verdict" style="font-size:12px;margin:0">verify(): -</span></div><div id="log"></div></div>
+ <div id="planc"><div class="tele">01 / <b>PLAN</b> + POLICY CHECK</div><ol class="steps" id="steps"></ol><div class="tele" id="agent" style="margin-top:.5em"></div></div>
+ <div id="flowc"><div class="tele">02 / <b>SAME PLAN, TWO WAYS</b></div>
+  <div class="lane"><div class="tele" style="color:var(--bad)">WITHOUT A GATE</div><div class="pipe" id="pA"></div><div class="res" id="rA"></div></div>
+  <div class="lane"><div class="tele" style="color:var(--ok)">WITH THE GATE</div><div class="pipe" id="pB"></div><div class="res" id="rB"></div>
+   <div id="ask"><p id="askp">Review the write steps. Nothing has happened yet.</p><button id="reject" class="big">Reject the plan</button><button id="approve">Approve anyway</button></div></div></div>
+ <div id="logc"><div class="tele">03 / <b>AUDIT LOG</b> SHA-256 CHAIN <span id="chain">-</span></div><div id="hint"></div><div id="log"></div></div>
+ <div id="costc"><div class="tele">THE COST / <span class="illus">ILLUSTRATIVE, EDIT THE NUMBERS</span></div><div id="calc"></div>
+  <div class="cost"><span class="lab">No gate</span><span class="bar bad"><i id="bA"></i></span><span class="v" id="vA">-</span><span class="lab">With gate</span><span class="bar ok"><i id="bB"></i></span><span class="v" id="vB">-</span></div>
+  <div class="math" id="math"></div></div>
 </div>
-<div class="act"><button class="big" id="go" disabled>Submit the plan</button><span class="verdict" id="out"></span></div>
+<div class="act"><select id="sc" aria-label="Pick a task"></select><button class="big" id="go" disabled>Run the agent</button><span class="verdict" id="out"></span></div>
 </main>
-<template id="info"><p>In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every step lands in a hash-chained log.</p><p>This page runs the real <code>gate.py</code> from this repo in your browser with Pyodide. After you decide, the page edits one log line to show the chain catching it.</p></template>
+<template id="info"><p>My agents can plan on their own, but any step that changes something outside the agent (sends, deletes, pays, merges) waits for a person. Every plan, decision and action lands in a hash-chained log, so an edit to any line is caught.</p><p>This page runs the real <code>gate.py</code> from this repo in your browser with Pyodide: <code>plan()</code>, <code>risk()</code>, <code>run()</code> with and without the gate, and <code>verify()</code>. The tasks and the flawed step in each are scripted. The cost panel is an illustrative model: every number is an input you can change, and the formula is shown under the bars.</p></template>
 <script src="vendor/pyodide.js"></script>
 <script type="module">
-import { mount, setStatus, sleep, autoFit } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
+import { mount, setStatus, sleep, autoFit, calc, usd } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
 mount("human-approval-gate", { status: "LOADING PYTHON" });
 const $ = id => document.getElementById(id);
+const SC = [
+ { name: "Chase overdue invoices", task: "read open invoices, draft reminder emails, send reminders to all 2400 contacts, update invoice status", flaw: 2, note: "only 240 invoices are overdue", hit: "2,400 reminder emails sent. They cannot be unsent." },
+ { name: "Tidy the CRM", task: "find duplicate contacts, merge 85 duplicate pairs, delete 1900 contacts with no activity this year", flaw: 2, note: "includes 300 annual-renewal customers", hit: "1,900 contacts deleted, renewal customers among them." },
+ { name: "Pay this week's vendors", task: "read approved bills, pay 12 approved bills, pay 3 bills still in dispute", flaw: 2, note: "disputed bills should be held", hit: "3 disputed bills paid. Recovering the money is a negotiation." }];
+SC.forEach((s, i) => $("sc").add(new Option(s.name, i)));
+const STAGES = ["PLAN", "CHECK", "PERSON", "ACT", "LOG"];
+const pipe = id => $(id).innerHTML = STAGES.map((s, i) => `${i ? '<span class="ln"></span>' : ""}<span class="st" id="${id}-${i}">${s}</span>`).join("");
+const stage = (id, i, cls) => { const e = $(id + "-" + i); e.className = "st " + cls; };
+const FIELDS = [
+ { id: "runs", label: "Agent runs a month", value: 60 }, { id: "flaw", label: "% of plans with a bad write", value: 3, step: .5 },
+ { id: "undo", label: "Cost to undo one ($)", value: 2000, step: 100 }, { id: "min", label: "Review minutes a run", value: 2 },
+ { id: "rate", label: "Reviewer $ an hour", value: 90 }, { id: "catch", label: "% bad steps a reviewer catches", value: 90 }];
+function cost(v) {
+  const bad = v.runs * v.flaw / 100, A = bad * v.undo, review = v.runs * v.min / 60 * v.rate, missed = bad * (1 - Math.min(v.catch, 100) / 100) * v.undo, B = review + missed, m = Math.max(A, B, 1);
+  $("bA").style.width = (A / m * 100) + "%"; $("bB").style.width = (B / m * 100) + "%";
+  $("vA").textContent = usd(A) + "/mo"; $("vB").textContent = usd(B) + "/mo";
+  $("math").innerHTML = `No gate: <b>${v.runs}</b> runs x <b>${v.flaw}%</b> bad x <b>${usd(v.undo)}</b> = <b>${usd(A)}</b>. With gate: review <b>${v.runs}</b> x <b>${v.min}</b> min x <b>${usd(v.rate)}</b>/h = ${usd(review)}, plus the <b>${100 - Math.min(v.catch, 100)}%</b> missed = ${usd(missed)}. Saves <b>${usd((A - B) * 12)}</b> a year.`;
+  document.body.dataset.saving = Math.round(A - B);
+}
+const read = calc($("calc"), FIELDS, cost); cost(read());
 const py = await loadPy({ "gate.py": "../gate.py" });
 py.runPython(`import json, gate
 from pathlib import Path
-LOG = Path("/home/pyodide/audit.log"); log = gate.Log(LOG)
+A = gate.Log(Path("/home/pyodide/nogate.log")); B = gate.Log(Path("/home/pyodide/audit.log"))
+def reset(): [l.path.unlink() for l in (A, B) if l.path.exists()]
+def plan(t): return json.dumps([[s, gate.risk(s)] for s in gate.plan(t)])
+def go(t, yes, gated): return json.dumps(gate.run(t, lambda s: yes, lambda s: "done: " + s, B if gated else A, gated=gated))
 def first_bad():
     p = gate.GENESIS
-    for i, e in enumerate(log.entries()):
+    for i, e in enumerate(B.entries()):
         b = {k: v for k, v in e.items() if k != "hash"}
         if e.get("seq") != i or e.get("prev") != p or gate._hash(b) != e.get("hash"): return i
         p = e["hash"]
     return -1
-def decide(task, yes): return gate.run(task, lambda s: yes, lambda s: "done: " + s, log)
-def tamper():
-    lines = LOG.read_text().splitlines(); e = json.loads(lines[1]); e["data"]["approved"] = not e["data"].get("approved", False)
-    lines[1] = json.dumps(e, sort_keys=True); LOG.write_text("\\n".join(lines) + "\\n")
-def reset(): LOG.exists() and LOG.unlink()`);
-const T = () => $("task").textContent;
+def tamper(i):
+    lines = B.path.read_text().splitlines(); e = json.loads(lines[i]); e["data"]["edited"] = True
+    lines[i] = json.dumps(e, sort_keys=True); B.path.write_text("\\n".join(lines) + "\\n")`);
+let cur, steps;
 async function render(anim) {
-  const entries = JSON.parse(py.runPython("json.dumps(log.entries())")), ok = py.runPython("log.verify()"), bad = py.runPython("first_bad()");
-  const have = $("log").children.length;
-  $("log").innerHTML = entries.map((e, i) => `<div class="entry${i < have || !anim ? " in" : ""}${bad >= 0 && e.seq >= bad ? " bad" : ""}"><span class="tele">#${String(e.seq).padStart(2, "0")} ${e.event}</span><span class="data"><br>${JSON.stringify(e.data)}</span><br><span class="hash">prev ${e.prev.slice(0, 12)}… hash ${e.hash.slice(0, 12)}…</span></div>`).join("");
-  for (const el of $("log").querySelectorAll(".entry:not(.in)")) { await sleep(450); el.classList.add("in"); }
-  $("status").textContent = "verify(): " + (entries.length ? (ok ? "chain valid" : "chain broken") : "-");
-  $("status").className = "verdict " + (entries.length ? (ok ? "ok" : "fail") : ""); return ok;
+  const es = JSON.parse(py.runPython("json.dumps(B.entries())")), ok = py.runPython("B.verify()"), bad = py.runPython("first_bad()"), have = $("log").children.length;
+  $("log").innerHTML = es.map((e, i) => `<div class="entry${i < have || !anim ? " in" : ""}${bad >= 0 && e.seq >= bad ? " bad" : ""}" data-i="${i}"><span class="ent">#${String(e.seq).padStart(2, "0")} ${e.event}</span><span class="data"> ${JSON.stringify(e.data).replace(/</g, "&lt;").slice(0, 90)}</span><br><span class="hash">prev ${e.prev.slice(0, 10)}.. hash ${e.hash.slice(0, 10)}..</span></div>`).join("");
+  for (const el of $("log").querySelectorAll(".entry:not(.in)")) { await sleep(300); el.classList.add("in"); }
+  $("chain").textContent = es.length ? (ok ? "VALID" : "BROKEN AT #" + String(bad).padStart(2, "0")) : "-"; $("chain").className = es.length ? (ok ? "ok" : "fail") : "";
+  document.body.dataset.chain = es.length ? (ok ? "valid" : "broken") : ""; return ok;
 }
-const show = async (ol, items) => { ol.innerHTML = items.map(x => `<li>${x}</li>`).join(""); for (const li of ol.children) { await sleep(500); li.classList.add("in"); } };
-async function submit() {
-  py.runPython("reset()"); delete document.body.dataset.done; $("go").disabled = true; $("out").textContent = ""; $("steps").innerHTML = $("results").innerHTML = ""; await render();
-  setStatus("PLANNING"); $("agent").innerHTML = '<span class="pulse">AGENT IS PLANNING…</span>'; await sleep(900);
-  await show($("steps"), py.globals.get("gate").plan(T()).toJs().map(x => x.replace(/</g, "&lt;")));
-  $("agent").textContent = "PLAN READY. WAITING FOR A PERSON."; setStatus("WAITING FOR YOU"); $("ask").classList.add("show");
+async function start() {
+  cur = SC[+$("sc").value]; delete document.body.dataset.done; delete document.body.dataset.chain; $("go").disabled = $("sc").disabled = true;
+  py.runPython("reset()"); $("steps").innerHTML = $("rA").innerHTML = $("rB").innerHTML = $("out").textContent = $("hint").textContent = ""; pipe("pA"); pipe("pB"); await render();
+  setStatus("PLANNING"); $("agent").innerHTML = '<span class="pulse">AGENT IS PLANNING</span>'; stage("pA", 0, "on"); stage("pB", 0, "on"); await sleep(700);
+  steps = JSON.parse(py.globals.get("plan")(cur.task));
+  $("steps").innerHTML = steps.map(([s], i) => `<li${i === cur.flaw ? ' class="flaw0"' : ""}><span class="tag" style="visibility:hidden">read</span><span class="txt">${s}</span></li>`).join("");
+  for (const li of $("steps").children) { await sleep(380); li.classList.add("in"); }
+  stage("pA", 0, "done"); stage("pB", 0, "done"); stage("pA", 1, "on"); stage("pB", 1, "on"); setStatus("POLICY CHECK"); $("agent").textContent = "RISK(): TAGGING EACH STEP";
+  for (const [i, li] of [...$("steps").children].entries()) { await sleep(320); const t = li.querySelector(".tag"); t.textContent = steps[i][1]; t.className = "tag " + (steps[i][1] === "write" ? "w" : "r"); t.style.visibility = "visible"; }
+  const writes = steps.filter(s => s[1] === "write").length; $("agent").textContent = `${writes} OF ${steps.length} STEPS WRITE TO THE WORLD`;
+  stage("pA", 1, "done"); stage("pB", 1, "done"); await sleep(500);
+  setStatus("NO GATE RUN"); stage("pA", 2, "stop"); $("rA").innerHTML = '<span class="x">Nobody is asked.</span>'; await sleep(600); stage("pA", 3, "on");
+  py.globals.get("go")(cur.task, true, false);
+  for (const [i, [s]] of steps.entries()) { await sleep(260); $("rA").innerHTML = `<span class="${i === cur.flaw ? "x" : ""}">ran: ${s}</span>`; }
+  stage("pA", 3, "stop"); stage("pA", 4, "done"); $("rA").innerHTML = `<span class="x">${cur.hit}</span><br><span class="x">Found later, by the people it hit.</span>`;
+  const li = $("steps").children[cur.flaw]; li.classList.add("flaw"); li.insertAdjacentHTML("beforeend", `<span class="why2">${cur.note}</span>`);
+  await sleep(700); setStatus("WAITING FOR YOU"); stage("pB", 2, "on"); $("rB").innerHTML = "Plan held. Nothing has run.";
+  $("askp").innerHTML = `Flagged: <span style="color:var(--bad)">${steps[cur.flaw][0]}</span> (${cur.note}).`; $("ask").classList.add("show"); $("reject").focus({ preventScroll: true });
 }
 async function decide(yes) {
-  $("agent").textContent = yes ? "APPROVED BY A PERSON." : "REJECTED BY A PERSON."; $("ask").classList.remove("show"); setStatus(yes ? "RUNNING" : "STOPPED");
-  const r = py.globals.get("decide")(T(), yes).toJs();
-  await show($("results"), r.length ? r : ['<span style="color:var(--dim)">Stopped. Not approved, nothing was done.</span>']);
-  await render(true); await sleep(900);
-  $("out").textContent = "Someone edits log entry #1…"; $("out").className = "verdict"; await sleep(900);
-  py.runPython("tamper()"); await render();
-  $("out").textContent = (yes ? "Approved steps ran. " : "Rejected, nothing ran. ") + "Tampering caught by verify()."; $("out").className = "verdict okc";
-  setStatus("DONE"); $("go").textContent = "Replay"; $("go").disabled = false; document.body.dataset.done = "1";
+  $("ask").classList.remove("show"); stage("pB", 2, yes ? "done" : "pass"); setStatus(yes ? "RUNNING" : "STOPPED");
+  const r = JSON.parse(py.globals.get("go")(cur.task, yes, true));
+  if (yes) { stage("pB", 3, "on"); for (const s of r) { await sleep(260); $("rB").textContent = s; } stage("pB", 3, "stop"); $("rB").innerHTML = `<span class="x">You approved it. ${cur.hit}</span><br>The log records that a person said yes.`; }
+  else { stage("pB", 3, "pass"); $("rB").innerHTML = `<span class="y">Rejected. Nothing ran. The agent re-plans without "${steps[cur.flaw][0]}".</span>`; }
+  stage("pB", 4, "on"); await render(true); stage("pB", 4, "done");
+  $("out").textContent = yes ? "Approved, logged with a person's yes" : "Caught before it ran"; $("out").className = "verdict " + (yes ? "badc" : "okc");
+  $("hint").textContent = "TAP ANY LOG LINE TO EDIT IT"; setStatus("DONE"); $("go").textContent = "Replay"; $("go").disabled = $("sc").disabled = false; document.body.dataset.done = "1";
 }
-$("go").onclick = submit; $("approve").onclick = () => decide(true); $("reject").onclick = () => decide(false);
-$("go").disabled = false; setStatus("READY"); autoFit(); document.body.dataset.ready = "1";
+$("log").onclick = async e => { const el = e.target.closest(".entry"); if (!el || !document.body.dataset.done) return; py.globals.get("tamper")(+el.dataset.i); await render(); $("hint").textContent = `ENTRY #${String(el.dataset.i).padStart(2, "0")} EDITED. VERIFY() CATCHES IT`; $("out").textContent = "Tampering caught by verify()"; $("out").className = "verdict okc"; };
+$("go").onclick = start; $("approve").onclick = () => decide(true); $("reject").onclick = () => decide(false);
+pipe("pA"); pipe("pB"); $("go").disabled = false; setStatus("READY"); autoFit(); document.body.dataset.ready = "1";
 </script></body></html>

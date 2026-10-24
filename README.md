@@ -2,14 +2,22 @@
 
 Agents plan alone, act only after a person says yes, and record every step in a hash-chained audit log that shows any tampering.
 
-**This is a scripted demo.** It represents the governance process I use in Palladium, my own agent framework. It is not a sample or excerpt of that system, and no Palladium code or data is in it.
+**This is a scripted demo that represents the process** I run in my own agent framework. It is not a sample or excerpt of that system, and none of its code or data is in it.
 
 - Live page: https://demos.obviouslogic.ai/human-approval-gate/
 - Source: https://github.com/obviouslogic-ai/human-approval-gate
 
-## How it fits Palladium governance
+## Why I built this
 
-In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every decision is logged so it can be checked later. This repo acts that rule out in about 100 lines of standard-library Python.
+An agent that plans well still gets things wrong some of the time, and the expensive mistakes are the writes: a deleted folder, an email to the wrong list, a payment run twice. In my own framework an agent can plan on its own, but any step that changes the world waits for a person, and every decision goes into a hash-chained log that shows any later edit. This repo acts that rule out in about 100 lines of standard-library Python.
+
+## The cost, without and with the gate
+
+The page has an illustrative cost model. Every number is an input you can change; none are measured or cited figures.
+
+- Without a gate: runs a month x share of runs with a bad write x cost to undo one.
+- With the gate: runs x review minutes x hourly rate, plus the bad writes the reviewer misses (runs x bad share x (1 - catch rate) x cost to undo).
+- Defaults: 60 runs, 3% bad, $2,000 to undo, 2 minutes a review, $90 an hour, 90% caught. That gives $3,600 a month without the gate and $540 with it.
 
 ## Run the CLI
 
@@ -27,7 +35,7 @@ python3 -m http.server 8000   # from the folder that holds this repo
 # open http://localhost:8000/human-approval-gate/web/
 ```
 
-The page fits one screen. Press **Submit the plan**: the agent plans, then waits for you to **Approve** or **Reject**. The steps run (or don't), the log fills in, then the page edits entry 1 and `verify()` turns red. Press **Replay** to run it again. The explanation sits behind **About this demo** in the corner. Add `?fast=1` to skip the pauses.
+The page fits one screen. Pick a task and press **Submit the plan**. The agent plans, `risk()` tags each step as read or write, and the same plan runs in two lanes. Without a gate the flawed write just runs. With the gate the run pauses for **Reject the plan** or **Approve anyway**. Every step lands in the SHA-256 audit log. Tap any entry to tamper with it and `verify()` shows where the chain breaks. Press **Replay** to run it again. The explanation sits behind **About this demo** in the corner. Add `?fast=1` to skip the pauses.
 
 The page runs this repo's real Python in the browser through Pyodide, so what you click is the same code the tests cover. Styling comes from `web/kit/`, shared across all five demos.
 
