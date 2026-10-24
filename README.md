@@ -27,7 +27,7 @@ python3 -m http.server 8000   # from the folder that holds this repo
 # open http://localhost:8000/human-approval-gate/web/
 ```
 
-Make a plan, approve or reject it, then press **Tamper with entry 1** and watch every later log line turn red.
+The page fits one screen. Press **Submit the plan**: the agent plans, then waits for you to **Approve** or **Reject**. The steps run (or don't), the log fills in, then the page edits entry 1 and `verify()` turns red. Press **Replay** to run it again. The explanation sits behind **About this demo** in the corner. Add `?fast=1` to skip the pauses.
 
 The page runs this repo's real Python in the browser through Pyodide, so what you click is the same code the tests cover. Styling comes from `web/kit/`, shared across all five demos.
 

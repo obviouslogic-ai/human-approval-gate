@@ -1,27 +1,28 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Approval gate · ObviousLogic demos</title><link rel="stylesheet" href="kit/kit.css">
 <style>
-#steps,#results{list-style:none;padding:0;margin:24px 0;font-size:20px}#steps li::before{content:"\2192  ";color:var(--dim)}#results li{color:var(--ok)}
-.entry{padding:12px 0;font:13px/1.6 var(--mono);word-break:break-all;transition:color .6s}.entry .hash{color:var(--dim)}
+.work{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:3vw}
+.col{min-height:0;overflow:hidden}.col .tele{margin-bottom:10px}
+.lane li{opacity:0;transform:translateY(6px);transition:all .4s}.lane li.in{opacity:1;transform:none}
+ol.lane{list-style:none;padding:0;margin:0;font-size:19px;line-height:1.5}#steps li::before{content:"\2192  ";color:var(--dim)}#results li{color:var(--ok)}
+#ask{margin-top:22px;display:none}#ask.show{display:block}#ask p{font-size:15px;color:var(--dim);margin:0 0 6px}
+.entry{padding:8px 0;font:12px/1.5 var(--mono);word-break:break-all;transition:color .6s;opacity:0}.entry.in{opacity:1;transition:opacity .4s,color .6s}.entry .hash{color:var(--dim)}
 .entry.bad,.entry.bad .hash{color:var(--bad)}#status.ok{color:var(--ok)}#status.fail{color:var(--bad)}
-</style></head><body>
-<section class="screen in"><div class="tele" data-kit-tele></div>
-<h1>Nothing acts until a person says yes.</h1>
-<p class="lede">In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every step lands in a hash-chained log. This page runs the real <code>gate.py</code> from this repo in your browser.</p>
-<p data-kit-note></p></section>
-<section class="screen"><div class="tele">STEP 01 / <b>PLAN</b></div><h2>What should the agent do?</h2>
-<label class="tele" for="task">Task, comma separated</label><input id="task" value="read report, summarize it, file summary">
-<div><button id="plan" disabled>Make plan</button></div><ol id="steps"></ol>
-<div class="tele">STEP 02 / <b>DECIDE</b></div>
-<div><button id="approve" class="go" disabled>Approve</button><button id="reject" disabled>Reject</button></div><ol id="results"></ol></section>
-<section class="screen"><div class="cols"><div><div class="tele">STEP 03 / <b>AUDIT LOG</b> &nbsp; SHA-256 CHAIN</div>
-<span id="status" class="verdict">verify(): -</span>
-<p class="lede">Each line carries the hash of the line before it. Change one value and every line after it stops matching.</p>
-<div><button id="tamper" class="danger" disabled>Tamper with entry 1</button><button id="reset" disabled>Reset</button></div></div>
-<div id="log"></div></div></section>
+.who{font:11px var(--mono);letter-spacing:.14em;color:var(--dim);margin-top:14px;min-height:1.4em}
+</style></head><body class="stage">
+<main class="stage-main">
+<div><div class="tele" data-kit-tele></div><h1>Nothing acts until a person says yes</h1></div>
+<div class="work">
+ <div class="col"><div class="tele">01 / <b>AGENT PLANS</b></div><div class="tele" style="color:var(--fg)">TASK: <span id="task">read report, summarize it, file summary</span></div><ol id="steps" class="lane"></ol><div class="who" id="agent"></div></div>
+ <div class="col"><div class="tele">02 / <b>HUMAN DECIDES</b></div><div id="ask"><p>The agent wants to run these steps. Nothing has happened yet.</p><button id="approve" class="go big">Approve</button> &nbsp; <button id="reject">Reject</button></div><ol id="results" class="lane"></ol></div>
+ <div class="col"><div class="tele">03 / <b>AUDIT LOG</b> &nbsp; SHA-256 CHAIN &nbsp; <span id="status" class="verdict" style="font-size:12px;margin:0">verify(): -</span></div><div id="log"></div></div>
+</div>
+<div class="act"><button class="big" id="go" disabled>Submit the plan</button><span class="verdict" id="out"></span></div>
+</main>
+<template id="info"><p>In Palladium, an agent can plan on its own, but anything that changes the world waits for my approval, and every step lands in a hash-chained log.</p><p>This page runs the real <code>gate.py</code> from this repo in your browser with Pyodide. After you decide, the page edits one log line to show the chain catching it.</p></template>
 <script src="vendor/pyodide.js"></script>
 <script type="module">
-import { mount, setStatus } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
+import { mount, setStatus, sleep } from "./kit/kit.js"; import { loadPy } from "./kit/py.js";
 mount("human-approval-gate", { status: "LOADING PYTHON" });
 const $ = id => document.getElementById(id);
 const py = await loadPy({ "gate.py": "../gate.py" });
@@ -40,17 +41,32 @@ def tamper():
     lines = LOG.read_text().splitlines(); e = json.loads(lines[1]); e["data"]["approved"] = not e["data"].get("approved", False)
     lines[1] = json.dumps(e, sort_keys=True); LOG.write_text("\\n".join(lines) + "\\n")
 def reset(): LOG.exists() and LOG.unlink()`);
-function render() {
+const T = () => $("task").textContent;
+async function render(anim) {
   const entries = JSON.parse(py.runPython("json.dumps(log.entries())")), ok = py.runPython("log.verify()"), bad = py.runPython("first_bad()");
-  $("log").innerHTML = entries.map(e => `<div class="entry${bad >= 0 && e.seq >= bad ? " bad" : ""}"><span class="tele">#${String(e.seq).padStart(2, "0")} ${e.event}</span><br>${JSON.stringify(e.data)}<br><span class="hash">prev ${e.prev.slice(0, 12)}… hash ${e.hash.slice(0, 12)}…</span></div>`).join("");
+  const have = $("log").children.length;
+  $("log").innerHTML = entries.map((e, i) => `<div class="entry${i < have || !anim ? " in" : ""}${bad >= 0 && e.seq >= bad ? " bad" : ""}"><span class="tele">#${String(e.seq).padStart(2, "0")} ${e.event}</span><br>${JSON.stringify(e.data)}<br><span class="hash">prev ${e.prev.slice(0, 12)}… hash ${e.hash.slice(0, 12)}…</span></div>`).join("");
+  for (const el of $("log").querySelectorAll(".entry:not(.in)")) { await sleep(450); el.classList.add("in"); }
   $("status").textContent = "verify(): " + (entries.length ? (ok ? "chain valid" : "chain broken") : "-");
-  $("status").className = "verdict " + (entries.length ? (ok ? "ok" : "fail") : "");
-  $("tamper").disabled = entries.length < 2;
+  $("status").className = "verdict " + (entries.length ? (ok ? "ok" : "fail") : ""); return ok;
 }
-$("plan").onclick = () => { const s = py.globals.get("gate").plan($("task").value).toJs(); $("steps").innerHTML = s.map(x => `<li>${x.replace(/</g, "&lt;")}</li>`).join(""); $("approve").disabled = $("reject").disabled = !s.length; $("results").innerHTML = ""; };
-const decide = yes => { const r = py.globals.get("decide")($("task").value, yes).toJs(); $("results").innerHTML = r.length ? r.map(s => `<li>${s}</li>`).join("") : '<li style="color:var(--dim)">Stopped. Not approved, nothing was done.</li>'; $("approve").disabled = $("reject").disabled = true; render(); };
-$("approve").onclick = () => decide(true); $("reject").onclick = () => decide(false);
-$("tamper").onclick = () => { py.runPython("tamper()"); render(); };
-$("reset").onclick = () => { py.runPython("reset()"); $("steps").innerHTML = $("results").innerHTML = ""; render(); };
-$("plan").disabled = $("reset").disabled = false; setStatus("READY"); render(); document.body.dataset.ready = "1";
+const show = async (ol, items) => { ol.innerHTML = items.map(x => `<li>${x}</li>`).join(""); for (const li of ol.children) { await sleep(500); li.classList.add("in"); } };
+async function submit() {
+  py.runPython("reset()"); delete document.body.dataset.done; $("go").disabled = true; $("out").textContent = ""; $("steps").innerHTML = $("results").innerHTML = ""; await render();
+  setStatus("PLANNING"); $("agent").innerHTML = '<span class="pulse">AGENT IS PLANNING…</span>'; await sleep(900);
+  await show($("steps"), py.globals.get("gate").plan(T()).toJs().map(x => x.replace(/</g, "&lt;")));
+  $("agent").textContent = "PLAN READY. WAITING FOR A PERSON."; setStatus("WAITING FOR YOU"); $("ask").classList.add("show");
+}
+async function decide(yes) {
+  $("agent").textContent = yes ? "APPROVED BY A PERSON." : "REJECTED BY A PERSON."; $("ask").classList.remove("show"); setStatus(yes ? "RUNNING" : "STOPPED");
+  const r = py.globals.get("decide")(T(), yes).toJs();
+  await show($("results"), r.length ? r : ['<span style="color:var(--dim)">Stopped. Not approved, nothing was done.</span>']);
+  await render(true); await sleep(900);
+  $("out").textContent = "Someone edits log entry #1…"; $("out").className = "verdict"; await sleep(900);
+  py.runPython("tamper()"); await render();
+  $("out").textContent = (yes ? "Approved steps ran. " : "Rejected, nothing ran. ") + "Tampering caught by verify()."; $("out").className = "verdict okc";
+  setStatus("DONE"); $("go").textContent = "Replay"; $("go").disabled = false; document.body.dataset.done = "1";
+}
+$("go").onclick = submit; $("approve").onclick = () => decide(true); $("reject").onclick = () => decide(false);
+$("go").disabled = false; setStatus("READY"); document.body.dataset.ready = "1";
 </script></body></html>
